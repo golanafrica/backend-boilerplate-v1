@@ -1,0 +1,208 @@
+# .cursorrules — Instructions pour Cursor AI
+# Projet : AfriStarter Backend Boilerplate
+# Lire docs/IA_CONTEXT.md pour le contexte complet
+
+# ============================================
+# IDENTITÉ DU PROJET
+# ============================================
+
+Tu es un assistant spécialisé dans le développement backend Node.js/TypeScript.
+Le projet est "AfriStarter" — un boilerplate backend pour développeurs africains.
+Il est vendu sur Chariow à 15 000 FCFA.
+Lis docs/IA_CONTEXT.md avant de générer du code.
+
+# ============================================
+# STACK TECHNIQUE (ne pas dévier)
+# ============================================
+
+- Runtime    : Node.js 18+
+- Langage    : TypeScript strict (jamais JavaScript)
+- Framework  : Express.js
+- ORM        : Prisma
+- Base       : PostgreSQL 15
+- Validation : Zod (jamais Joi, jamais express-validator)
+- Auth       : JWT access token (15min) + refresh token (7j)
+- Paiement   : FedaPay SDK officiel (jamais axios pour FedaPay)
+- Logs       : Winston (jamais console.log)
+- Docs API   : Swagger (swagger-ui-express + swagger-jsdoc)
+- Container  : Docker + docker-compose
+
+# ============================================
+# STRUCTURE DES DOSSIERS (respecter absolument)
+# ============================================
+
+src/
+├── config/       → Initialisation services externes
+├── controllers/  → req → appel service → res
+├── middlewares/  → auth, isAdmin, validate, errorHandler
+├── routes/       → définition endpoints + middlewares
+├── services/     → toute la logique métier
+├── utils/        → AppError, jwt, logger
+├── types/        → express.d.ts, types globaux
+└── validations/  → schémas Zod uniquement
+
+# ============================================
+# PATTERNS OBLIGATOIRES
+# ============================================
+
+## Controller (toujours ce pattern)
+export const action = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const result = await monService.action(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error); // toujours next(error), jamais res.status(500) direct
+  }
+};
+
+## Service (toujours ce pattern)
+export const monService = {
+  async action(input: TypeInput): Promise<TypeOutput> {
+    // logique métier ici
+    // appel Prisma ici
+    // lancer AppError si erreur métier
+  }
+};
+
+## Validation Zod (toujours ce pattern)
+export const monSchema = z.object({
+  body: z.object({
+    champ: z.string().min(1, 'Champ requis'),
+  })
+});
+
+## Route (toujours ce pattern)
+router.post('/endpoint', auth, validate(monSchema), monController);
+
+## Erreur (toujours AppError)
+throw new AppError('Message clair pour le client', 400);
+
+# ============================================
+# CONVENTIONS TYPESCRIPT
+# ============================================
+
+- Toujours typer les paramètres et retours de fonctions
+- Inférer les types Zod avec z.infer<typeof schema>
+- Étendre Request Express via src/types/express.d.ts
+- Utiliser async/await (jamais .then() .catch())
+- Utiliser import/export ES Modules (jamais require())
+- Préférer const (jamais var, éviter let si possible)
+
+# ============================================
+# SWAGGER — documenter chaque route
+# ============================================
+
+/**
+ * @swagger
+ * /api/v1/auth/login:
+ *   post:
+ *     summary: Connexion utilisateur
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Connexion réussie
+ *       401:
+ *         description: Identifiants invalides
+ */
+
+# ============================================
+# RÉPONSES API — format standard
+# ============================================
+
+# Succès
+{ "success": true,  "data": { ... } }
+{ "success": true,  "message": "Action effectuée" }
+
+# Erreur
+{ "success": false, "message": "Description claire de l'erreur" }
+
+# Liste paginée (si besoin)
+{ "success": true,  "data": [...], "total": 42, "page": 1 }
+
+# ============================================
+# PRISMA — règles importantes
+# ============================================
+
+- Toujours await les appels Prisma
+- Ne jamais retourner le champ password dans select
+- Utiliser select explicite plutôt que tout récupérer
+- Ne jamais modifier schema.prisma sans le dire explicitement
+- Créer une migration après chaque modification du schema
+
+# Exemple select sécurisé
+const user = await prisma.user.findUnique({
+  where: { id },
+  select: {
+    id: true,
+    email: true,
+    role: true,
+    createdAt: true,
+    // password: false ← jamais retourner le password
+  }
+});
+
+# ============================================
+# RESTRICTIONS ABSOLUES
+# ============================================
+
+❌ Ne JAMAIS utiliser `any` comme type TypeScript
+❌ Ne JAMAIS stocker un mot de passe en clair
+❌ Ne JAMAIS retourner le champ `password` dans une réponse
+❌ Ne JAMAIS hardcoder une clé API ou secret
+❌ Ne JAMAIS modifier schema.prisma sans prévenir
+❌ Ne JAMAIS oublier `await` sur les appels Prisma
+❌ Ne JAMAIS créer de dépendances npm non listées dans le stack
+❌ Ne JAMAIS utiliser `console.log` (utiliser logger.info/error)
+❌ Ne JAMAIS utiliser `.then()` ou `.catch()` (utiliser async/await)
+❌ Ne JAMAIS utiliser `var`
+
+# ============================================
+# COMPORTEMENT ATTENDU DE CURSOR
+# ============================================
+
+Quand je demande de générer du code :
+1. Lire docs/IA_CONTEXT.md pour le contexte complet
+2. Respecter la structure des dossiers
+3. Suivre le pattern Controller → Service → Prisma
+4. Toujours inclure les imports en haut du fichier
+5. Générer du code complet (pas des extraits incomplets)
+6. Ajouter les commentaires Swagger sur chaque route
+7. Typer explicitement tous les paramètres et retours
+8. Utiliser AppError pour toutes les erreurs métier
+
+Quand je demande de modifier du code existant :
+1. Ne modifier que ce qui est demandé
+2. Ne pas changer les imports existants sauf si nécessaire
+3. Ne pas reformatter tout le fichier
+4. Signaler si la modification impacte d'autres fichiers
+
+Quand je pose une question sur le projet :
+1. Répondre en français
+2. Donner des exemples de code concrets
+3. Référencer les fichiers concernés
+4. Signaler les impacts sur d'autres parties du projet
+
+# ============================================
+# COMMANDES UTILES (pour mémoire)
+# ============================================
+
+npm run dev                    → démarrer le serveur
+npm run build                  → compiler TypeScript
+npm run setup                  → installation complète
+npm run seed                   → réinitialiser la base
+npm run change-admin-password  → changer mot de passe admin
+npx prisma studio              → interface visuelle BDD
+npx prisma migrate dev         → nouvelle migration
+docker-compose up -d           → démarrer PostgreSQL
+docker-compose logs app        → voir les logs
