@@ -1,0 +1,46 @@
+{
+  "name": "backend-boilerplate-v1",
+  "version": "1.0.0",
+  "description": "Backend boilerplate with Express, TypeScript, JWT, FedaPay",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "setup": "bash scripts/setup.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/golanafrica/backend-boilerplate-v1.git"
+  },
+  "keywords": ["boilerplate", "express", "typescript", "jwt", "fedapay"],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/golanafrica/backend-boilerplate-v1/issues"
+  },
+  "homepage": "https://github.com/golanafrica/backend-boilerplate-v1#readme",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "fedapay": "^1.2.5",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.11.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.9.3",
+    "nodemon": "^3.1.14",
+    "prisma": "^7.8.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
