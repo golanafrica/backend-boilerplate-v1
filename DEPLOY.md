@@ -28,6 +28,7 @@ Avant le déploiement, vous devez disposer de :
 | **Accès SSH** | Utilisateur root ou sudo |
 | **Domaine** | (Recommandé) ex: api.votresite.com |
 | **Clés FedaPay** | Compte [FedaPay](https://fedapay.com) avec clés live |
+| **Node.js** | Version 18+ sur le VPS |
 
 > 💡 **Pas de VPS ?** Nous pouvons vous en créer un (frais supplémentaires selon le forfait).
 

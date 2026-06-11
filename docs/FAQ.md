@@ -144,6 +144,16 @@ Utilisez vos clés API live FedaPay
 
 Vérifiez les montants minimum selon l'opérateur (Orange Money: 100 FCFA, MTN Money: 50 FCFA)
 
+### ❓ FedaPay retourne "unauthorized" en production
+
+**Cause :** Clés API live incorrectes ou environnement non configuré
+
+**Solution :**
+1. Vérifiez que vous utilisez les clés **live** (pas sandbox)
+2. Confirmez que l'environnement est `'live'` dans `src/config/fedapay.ts`
+3. Vérifiez que votre compte FedaPay est **activé pour les transactions live**
+
+
 ❓ Que faire si le paiement reste en status PENDING ?
 Causes possibles :
 

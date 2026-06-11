@@ -9,6 +9,8 @@ markdown
 | npm | 9+ | `npm --version` |
 | Docker | 20+ | `docker --version` |
 | Git | 2.40+ | `git --version` |
+| `npm run lint` | Vérification du code avec ESLint |
+
 
 ---
 

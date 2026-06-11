@@ -309,3 +309,16 @@ Prisma + PostgreSQL offre un typage fort, des migrations versionnées et des rel
 
 ### Pourquoi multi-stage Docker ?
 L'image finale ne contient pas TypeScript ni le code source — uniquement le JavaScript compilé. Image plus légère, plus sécurisée, plus rapide à déployer.
+
+## 📝 Logging
+
+L'application utilise **Winston** pour les logs :
+
+| Niveau | Utilisation |
+|--------|-------------|
+| `error` | Erreurs critiques (base de données, API externe) |
+| `warn` | Avertissements (tentative d'accès non autorisé) |
+| `info` | Actions normales (connexion, paiement initié) |
+| `debug` | Détails développement (requêtes SQL) |
+
+**Fichier de configuration :** `src/utils/logger.ts`

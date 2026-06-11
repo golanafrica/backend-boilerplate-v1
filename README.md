@@ -148,7 +148,7 @@ backend-boilerplate-v1/
 env
 PORT=3000
 DATABASE_URL="postgresql://postgres:password@localhost:5432/boilerplate"
-JWT_SECENT=change_this_key
+JWT_SECRET=change_this_key
 JWT_REFRESH_SECRET=change_this_refresh_key
 FEDAPAY_API_KEY=pk_sandbox_xxx
 Toutes les variables sont commentées dans .env.example
