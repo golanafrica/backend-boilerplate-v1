@@ -23,7 +23,7 @@ app.use(helmet());
 
 // CORS (autoriser les requêtes cross-origin)
 app.use(cors({
-  origin: '*', // À restreindre en production avec votre domaine
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -31,18 +31,13 @@ app.use(cors({
 // Parser JSON
 app.use(express.json({ limit: '10mb' }));
 
-// Parser URL encoded (pour les formulaires)
+// Parser URL encoded
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // =====================
 // ROUTES DE TEST
 // =====================
 
-/**
- * @route   GET /health
- * @desc    Vérifier l'état du serveur
- * @access  Public
- */
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({
     status: 'OK',
@@ -52,20 +47,10 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-/**
- * @route   GET /
- * @desc    Page d'accueil (redirection vers /health)
- * @access  Public
- */
 app.get('/', (req: Request, res: Response) => {
   res.redirect('/health');
 });
 
-/**
- * @route   GET /api/v1
- * @desc    Informations API
- * @access  Public
- */
 app.get('/api/v1', (req: Request, res: Response) => {
   res.status(200).json({
     name: 'AfriStarter Backend API',
@@ -84,9 +69,6 @@ app.get('/api/v1', (req: Request, res: Response) => {
 // GESTION DES ERREURS
 // =====================
 
-/**
- * Route 404 - Non trouvée
- */
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,
@@ -94,9 +76,6 @@ app.use((req: Request, res: Response) => {
   });
 });
 
-/**
- * Gestionnaire d'erreurs global
- */
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('❌ Erreur:', err.stack);
   
@@ -112,7 +91,6 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // DÉMARRAGE DU SERVEUR
 // =====================
 
-// Démarrer le serveur seulement si ce fichier est exécuté directement
 if (require.main === module) {
   const server = app.listen(PORT, () => {
     console.log(`
@@ -125,7 +103,6 @@ if (require.main === module) {
     `);
   });
 
-  // Gestion des signaux d'arrêt
   process.on('SIGINT', () => {
     console.log('\n🛑 Arrêt du serveur...');
     server.close(() => {
@@ -135,5 +112,4 @@ if (require.main === module) {
   });
 }
 
-// Export pour les tests (optionnel)
 export default app;
