@@ -1,23 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { paiementService } from '../services/paiement.service';
 import { fedapayClient } from '../config/fedapay';
-import { AppError } from '../utils/AppError';
 
 export class PaiementController {
-  /**
-   * POST /api/v1/paiement/initier
-   * Initier un paiement Mobile Money
-   */
   async initierPaiement(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;  // ✅ Cast explicite
+      const userId = (req as any).user.id;
       const { amount, phone, description } = req.body;
 
       const result = await paiementService.initierPaiement(
-        userId,
-        amount,
-        phone,
-        description
+        userId, amount, phone, description
       );
 
       res.status(201).json({
@@ -42,16 +34,17 @@ export class PaiementController {
 
   /**
    * POST /api/v1/paiement/webhook
-   * Recevoir les webhooks de FedaPay (endpoint PUBLIC)
+   * 🔒 Utilise req.rawBody (capturé par middleware dans routes)
    */
   async webhook(req: Request, res: Response, next: NextFunction) {
     try {
       const signature = req.headers['x-fedapay-signature'] as string;
-      const rawBody = JSON.stringify(req.body);
+      
+      // 🔒 Récupérer le raw body (capturé dans paiementRoutes.ts)
+      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
 
-      // 🔒 Vérifier la signature du webhook (sécurité)
       if (signature && !fedapayClient.verifyWebhookSignature(rawBody, signature)) {
-        console.warn('[FedaPay Webhook] Signature invalide');
+        console.warn('[FedaPay Webhook] ❌ Signature invalide depuis', req.ip);
         return res.status(401).json({
           success: false,
           message: 'Signature webhook invalide',
@@ -60,7 +53,6 @@ export class PaiementController {
 
       const transaction = await paiementService.handleWebhook(req.body);
 
-      // Répondre immédiatement à FedaPay (ils attendent un 200)
       res.status(200).json({
         success: true,
         message: 'Webhook traité',
@@ -68,8 +60,8 @@ export class PaiementController {
         status: transaction.status,
       });
     } catch (error) {
-      // Même en cas d'erreur, répondre 200 pour éviter les retries de FedaPay
       console.error('[FedaPay Webhook] Erreur:', error);
+      // Toujours répondre 200 à FedaPay pour éviter les retries
       res.status(200).json({
         success: false,
         message: 'Webhook reçu mais erreur de traitement',
@@ -77,13 +69,9 @@ export class PaiementController {
     }
   }
 
-  /**
-   * GET /api/v1/paiement/status/:id
-   * Récupérer le statut d'une transaction
-   */
   async getStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;  // ✅ Cast explicite
+      const userId = (req as any).user.id;
       const transactionId = req.params.id as string;
 
       const transaction = await paiementService.getTransactionStatus(transactionId, userId);
@@ -104,31 +92,20 @@ export class PaiementController {
     }
   }
 
-  /**
-   * GET /api/v1/paiement/history
-   * Historique des transactions de l'utilisateur connecté
-   */
   async getHistory(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;  // ✅ Cast explicite
+      const userId = (req as any).user.id;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
 
       const result = await paiementService.getUserTransactions(userId, page, limit);
 
-      res.json({
-        success: true,
-        ...result,
-      });
+      res.json({ success: true, ...result });
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * GET /api/v1/paiement/success
-   * Page de redirection après paiement réussi
-   */
   async success(req: Request, res: Response) {
     res.json({
       success: true,
@@ -137,10 +114,6 @@ export class PaiementController {
     });
   }
 
-  /**
-   * GET /api/v1/paiement/cancel
-   * Page de redirection après paiement annulé
-   */
   async cancel(req: Request, res: Response) {
     res.status(400).json({
       success: false,

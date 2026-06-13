@@ -1,11 +1,11 @@
 import axios, { AxiosInstance } from 'axios';
+import crypto from 'crypto';
 
 /**
  * Client FedaPay personnalisé (API REST directe)
  * Remplace le SDK officiel vulnérable par un wrapper sécurisé
  * Documentation : https://docs.fedapay.com
  */
-
 class FedaPayClient {
   private client: AxiosInstance;
   private webhookSecret: string;
@@ -19,14 +19,13 @@ class FedaPayClient {
       throw new Error('FEDAPAY_API_KEY is not defined in environment variables');
     }
 
-    // URLs officielles FedaPay
     const baseURL = environment === 'live'
       ? 'https://api.fedapay.com/v1'
       : 'https://api-sandbox.fedapay.com/v1';
 
     this.client = axios.create({
       baseURL,
-      timeout: 30000, // 30 secondes
+      timeout: 30000,
       headers: {
         'Authorization': apiKey,
         'Content-Type': 'application/json',
@@ -34,7 +33,6 @@ class FedaPayClient {
       },
     });
 
-    // Intercepteur pour logger les erreurs
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -48,9 +46,6 @@ class FedaPayClient {
     );
   }
 
-  /**
-   * Créer une transaction Mobile Money
-   */
   async createTransaction(params: {
     amount: number;
     phone: string;
@@ -60,7 +55,7 @@ class FedaPayClient {
     try {
       const response = await this.client.post('/transactions', {
         amount: params.amount.toString(),
-        currency: 'XOF', // FCFA
+        currency: 'XOF',
         description: params.description,
         callback_url: params.callback_url || process.env.FEDAPAY_SUCCESS_URL,
         customer: {
@@ -74,9 +69,6 @@ class FedaPayClient {
     }
   }
 
-  /**
-   * Récupérer une transaction par ID
-   */
   async getTransaction(transactionId: string) {
     try {
       const response = await this.client.get(`/transactions/${transactionId}`);
@@ -87,26 +79,39 @@ class FedaPayClient {
   }
 
   /**
-   * Vérifier la signature du webhook (sécurité)
+   * Vérifier la signature HMAC-SHA256 du webhook
+   * 🔒 Protection : gestion des longueurs différentes + try/catch
    */
   verifyWebhookSignature(payload: string, signature: string): boolean {
     if (!this.webhookSecret) {
-      console.warn('[FedaPay] WEBHOOK_SECRET not configured - skipping signature verification');
-      return true; // En dev, on accepte si pas de secret configuré
+      console.warn('[FedaPay] WEBHOOK_SECRET non configuré - vérification ignorée (DEV uniquement)');
+      return true;
     }
 
-    const crypto = require('crypto');
-    const expectedSignature = crypto
-      .createHmac('sha256', this.webhookSecret)
-      .update(payload)
-      .digest('hex');
+    if (!signature || typeof signature !== 'string') {
+      return false;
+    }
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    try {
+      const expectedSignature = crypto
+        .createHmac('sha256', this.webhookSecret)
+        .update(payload, 'utf8')
+        .digest('hex');
+
+      // 🔒 Sécurité : timingSafeEqual exige des buffers de même taille
+      if (signature.length !== expectedSignature.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(
+        Buffer.from(signature, 'utf8'),
+        Buffer.from(expectedSignature, 'utf8')
+      );
+    } catch (error) {
+      console.error('[FedaPay] Erreur vérification signature:', error);
+      return false;
+    }
   }
 }
 
-// Singleton
 export const fedapayClient = new FedaPayClient();

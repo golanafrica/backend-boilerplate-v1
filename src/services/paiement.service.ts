@@ -12,7 +12,6 @@ export class PaiementService {
     phone: string,
     description: string
   ) {
-    // 1. Créer la transaction en base (statut PENDING)
     const transaction = await prisma.transaction.create({
       data: {
         userId,
@@ -23,7 +22,6 @@ export class PaiementService {
     });
 
     try {
-      // 2. Appeler FedaPay pour créer le paiement
       const fedapayResponse = await fedapayClient.createTransaction({
         amount,
         phone,
@@ -31,7 +29,6 @@ export class PaiementService {
         callback_url: `${process.env.APP_URL || 'http://localhost:3000'}/api/v1/paiement/callback`,
       });
 
-      // 3. Mettre à jour la transaction avec l'ID FedaPay
       const updatedTransaction = await prisma.transaction.update({
         where: { id: transaction.id },
         data: {
@@ -39,22 +36,17 @@ export class PaiementService {
         },
         include: {
           user: {
-            select: {
-              id: true,
-              email: true,
-              role: true,
-            },
+            select: { id: true, email: true, role: true },
           },
         },
       });
 
       return {
         transaction: updatedTransaction,
-        paymentUrl: fedapayResponse.url || null, // URL pour rediriger l'utilisateur
-        token: fedapayResponse.token || null, // Token de paiement
+        paymentUrl: fedapayResponse.url || null,
+        token: fedapayResponse.token || null,
       };
     } catch (error) {
-      // En cas d'erreur, marquer la transaction comme FAILED
       await prisma.transaction.update({
         where: { id: transaction.id },
         data: { status: 'FAILED' },
@@ -65,17 +57,31 @@ export class PaiementService {
   }
 
   /**
+   * Mapper un statut FedaPay vers notre statut
+   * 🔒 Protection : gestion des valeurs null/undefined
+   */
+  private mapFedaPayStatus(rawStatus: any): 'PENDING' | 'SUCCESS' | 'FAILED' {
+    const status = String(rawStatus || '').toLowerCase().trim();
+
+    if (['approved', 'completed', 'successful', 'success'].includes(status)) {
+      return 'SUCCESS';
+    }
+    if (['failed', 'rejected', 'cancelled', 'canceled', 'declined'].includes(status)) {
+      return 'FAILED';
+    }
+    return 'PENDING';
+  }
+
+  /**
    * Gérer le webhook de FedaPay
    */
   async handleWebhook(payload: any) {
     const fedapayId = payload.transaction_id?.toString() || payload.id?.toString();
-    const status = payload.status;
 
     if (!fedapayId) {
       throw new AppError('Transaction ID manquant dans le webhook', 400);
     }
 
-    // Trouver la transaction dans notre base
     const transaction = await prisma.transaction.findFirst({
       where: { fedapayId },
     });
@@ -84,25 +90,14 @@ export class PaiementService {
       throw new AppError('Transaction non trouvée dans notre système', 404);
     }
 
-    // Mapper le statut FedaPay vers notre statut
-    let newStatus: 'PENDING' | 'SUCCESS' | 'FAILED' = 'PENDING';
-    
-    if (['approved', 'completed', 'successful', 'success'].includes(status?.toLowerCase())) {
-      newStatus = 'SUCCESS';
-    } else if (['failed', 'rejected', 'cancelled', 'canceled'].includes(status?.toLowerCase())) {
-      newStatus = 'FAILED';
-    }
+    const newStatus = this.mapFedaPayStatus(payload.status);
 
-    // Mettre à jour le statut
     const updatedTransaction = await prisma.transaction.update({
       where: { id: transaction.id },
       data: { status: newStatus },
       include: {
         user: {
-          select: {
-            id: true,
-            email: true,
-          },
+          select: { id: true, email: true },
         },
       },
     });
@@ -117,17 +112,10 @@ export class PaiementService {
    */
   async getTransactionStatus(transactionId: string, userId: string) {
     const transaction = await prisma.transaction.findFirst({
-      where: {
-        id: transactionId,
-        userId, // Sécurité : vérifier que l'utilisateur est bien le propriétaire
-      },
+      where: { id: transactionId, userId },
       include: {
         user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-          },
+          select: { id: true, email: true, role: true },
         },
       },
     });
@@ -136,25 +124,18 @@ export class PaiementService {
       throw new AppError('Transaction non trouvée', 404);
     }
 
-    // Si la transaction est encore PENDING, vérifier le statut auprès de FedaPay
     if (transaction.status === 'PENDING' && transaction.fedapayId) {
       try {
         const fedapayData = await fedapayClient.getTransaction(transaction.fedapayId);
         const fedapayStatus = fedapayData.transaction?.status || fedapayData.status;
+        const newStatus = this.mapFedaPayStatus(fedapayStatus);
 
-        // Mettre à jour si le statut a changé
-        if (['approved', 'completed', 'successful'].includes(fedapayStatus?.toLowerCase())) {
+        if (newStatus !== 'PENDING') {
           await prisma.transaction.update({
             where: { id: transaction.id },
-            data: { status: 'SUCCESS' },
+            data: { status: newStatus },
           });
-          transaction.status = 'SUCCESS';
-        } else if (['failed', 'rejected', 'cancelled'].includes(fedapayStatus?.toLowerCase())) {
-          await prisma.transaction.update({
-            where: { id: transaction.id },
-            data: { status: 'FAILED' },
-          });
-          transaction.status = 'FAILED';
+          transaction.status = newStatus;
         }
       } catch (error) {
         console.error('[FedaPay] Erreur lors de la vérification du statut:', error);

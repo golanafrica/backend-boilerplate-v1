@@ -1,14 +1,32 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import { auth } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { paiementController } from '../controllers/paiementController';
 import { 
   initierPaiementSchema, 
-  webhookSchema,
   transactionIdParamSchema 
 } from '../validations/paiementValidation';
 
 const router = Router();
+
+/**
+ * 🔒 Middleware pour capturer le raw body du webhook
+ * Nécessaire pour la vérification HMAC-SHA256
+ * express.raw() remplace express.json() pour cette route uniquement
+ */
+const captureWebhookRawBody = (req: Request, res: Response, next: NextFunction) => {
+  // Si le body est déjà un Buffer (depuis express.raw)
+  if (Buffer.isBuffer(req.body)) {
+    (req as any).rawBody = req.body.toString('utf8');
+    try {
+      req.body = JSON.parse((req as any).rawBody);
+    } catch {
+      // Si ce n'est pas du JSON valide, on garde le body tel quel
+    }
+  }
+  next();
+};
 
 /**
  * @swagger
@@ -92,7 +110,16 @@ router.post(
  *     description: |
  *       Endpoint appelé par FedaPay pour notifier du statut d'un paiement.
  *       La signature HMAC-SHA256 est vérifiée automatiquement.
+ *       
+ *       🔒 **Sécurité** : Le header `X-FedaPay-Signature` doit contenir la signature HMAC-SHA256 
+ *       du body, calculée avec la clé `FEDAPAY_WEBHOOK_SECRET`.
  *     tags: [Paiement]
+ *     parameters:
+ *       - in: header
+ *         name: X-FedaPay-Signature
+ *         schema:
+ *           type: string
+ *         description: Signature HMAC-SHA256 du body (optionnel en dev)
  *     requestBody:
  *       required: true
  *       content:
@@ -102,13 +129,19 @@ router.post(
  *             properties:
  *               transaction_id:
  *                 type: string
+ *                 description: ID de la transaction FedaPay
+ *               id:
+ *                 type: string
+ *                 description: ID alternatif de la transaction
  *               status:
  *                 type: string
+ *                 description: Statut du paiement (approved, failed, etc.)
  *               amount:
  *                 type: string
+ *                 description: Montant du paiement
  *     responses:
  *       200:
- *         description: Webhook traité
+ *         description: Webhook traité (toujours 200 pour éviter les retries FedaPay)
  *         content:
  *           application/json:
  *             schema:
@@ -124,12 +157,17 @@ router.post(
  *                   type: string
  *                 status:
  *                   type: string
+ *                   enum: [PENDING, SUCCESS, FAILED]
  *       401:
  *         description: Signature webhook invalide
  */
 router.post(
   '/webhook',
-  validate(webhookSchema),
+  // 🔒 express.raw() capture le body brut AVANT parsing JSON
+  express.raw({ type: 'application/json', limit: '10kb' }),
+  // 🔒 Middleware pour parser et stocker le raw body
+  captureWebhookRawBody,
+  // ❌ PAS de validate(webhookSchema) : FedaPay peut envoyer des champs variables
   paiementController.webhook.bind(paiementController)
 );
 
@@ -236,10 +274,28 @@ router.get(
  * /api/v1/paiement/success:
  *   get:
  *     summary: Page de redirection après paiement réussi
+ *     description: L'utilisateur est redirigé ici par FedaPay après un paiement approuvé
  *     tags: [Paiement]
+ *     parameters:
+ *       - in: query
+ *         name: transaction_id
+ *         schema:
+ *           type: string
+ *         description: ID de la transaction FedaPay
  *     responses:
  *       200:
  *         description: Paiement réussi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Paiement réussi !
  */
 router.get('/success', paiementController.success.bind(paiementController));
 
@@ -248,10 +304,28 @@ router.get('/success', paiementController.success.bind(paiementController));
  * /api/v1/paiement/cancel:
  *   get:
  *     summary: Page de redirection après paiement annulé
+ *     description: L'utilisateur est redirigé ici par FedaPay après annulation
  *     tags: [Paiement]
+ *     parameters:
+ *       - in: query
+ *         name: transaction_id
+ *         schema:
+ *           type: string
+ *         description: ID de la transaction FedaPay
  *     responses:
  *       400:
  *         description: Paiement annulé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Paiement annulé
  */
 router.get('/cancel', paiementController.cancel.bind(paiementController));
 
