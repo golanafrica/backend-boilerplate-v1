@@ -3,10 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import paiementRoutes from './routes/paiementRoutes';
+import { swaggerSpec } from './config/swagger';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -50,6 +52,16 @@ app.use('/api/', limiter);
 // Parsers
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// =====================
+// SWAGGER DOCUMENTATION
+// =====================
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'AfriStarter API Documentation',
+  customfavIcon: 'https://avatars.githubusercontent.com/u/136971789',
+}));
 
 // =====================
 // ROUTES DE TEST
@@ -126,6 +138,7 @@ if (require.main === module) {
 ║  📡 Serveur démarré sur http://localhost:${PORT}      ║
 ║  ❤️  Health check: http://localhost:${PORT}/health    ║
 ║  📚 API: http://localhost:${PORT}/api/v1             ║
+║  📖 Swagger: http://localhost:${PORT}/api-docs       ║
 ║  💰 Paiement: http://localhost:${PORT}/api/v1/paiement ║
 ║  🔒 Mode: ${process.env.NODE_ENV || 'development'}              ║
 ╚══════════════════════════════════════════════════════╝

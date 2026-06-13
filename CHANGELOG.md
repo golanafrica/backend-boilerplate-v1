@@ -5,7 +5,49 @@ Tous les changements notables de ce projet seront documentés dans ce fichier.
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ---
+
+## [0.6.0] - 2026-06-14
+
+### ✅ Ajouté (Added)
+
+#### J6 - Documentation Swagger
+- Configuration Swagger OpenAPI 3.0 (`src/config/swagger.ts`)
+- Swagger UI interactif accessible sur `/api-docs`
+- Documentation JSDoc complète pour tous les endpoints
+  - Auth : register, login, refresh, logout, me
+  - Users : getAllUsers, getUserById, updateUserRole, deleteUser
+  - Paiement : initier, webhook, status, history, success, cancel
+- Schémas de composants réutilisables (User, Transaction, Error)
+- Schéma de sécurité bearerAuth pour JWT
+- Tags de regroupement (Auth, Users, Paiement)
+- CSS personnalisé et favicon
+- Titre personnalisé "AfriStarter API Documentation"
+
+### 🔧 Amélioré (Improved)
+- README mis à jour avec tous les 15 endpoints
+- README : remplacement "FedaPay SDK" par "FedaPay REST API"
+- README : ajout badges de sécurité (0 vulnérabilités npm audit)
+- README : documentation HMAC-SHA256 webhook verification
+- README : validation téléphone burkinabè mentionnée
+- README : pagination documentée pour /users et /paiement/history
+- README : 5 exemples cURL (register, login, payment, history, users)
+- README : 12 variables d'environnement documentées
+- README : 10 tests de validation listés
+- README : formatage markdown corrigé (tableaux, code blocks)
+
+### 📊 Métriques v0.6.0
+
+| Métrique | Valeur |
+|----------|--------|
+| Lignes de code (TypeScript) | ~1500 |
+| Nombre d'endpoints | 15 |
+| Endpoints documentés Swagger | 15 (100%) |
+| Jours complétés | 6 / 10 |
+| Progression globale | 60% |
+| Tests manuels effectués | ✅ J3 + J4 + J5 validés |
+| Vulnérabilités npm audit | 0 |
 
 ## [0.5.0] - 2026-06-13
 
