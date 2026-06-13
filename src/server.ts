@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import authRoutes from './routes/authRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -64,6 +65,8 @@ app.get('/api/v1', (req: Request, res: Response) => {
     }
   });
 });
+
+app.use('/api/v1/auth', authRoutes);
 
 // =====================
 // GESTION DES ERREURS
