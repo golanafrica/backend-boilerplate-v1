@@ -1,4 +1,3 @@
-markdown
 # Changelog
 
 Tous les changements notables de ce projet seront documentés dans ce fichier.
@@ -8,135 +7,132 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [1.0.0] - 2026-06-11
+## [0.5.0] - 2026-06-13
 
 ### ✅ Ajouté (Added)
 
-#### Authentification
+#### J4 - Gestion utilisateurs admin
+- `GET /api/v1/users` - Liste des utilisateurs avec pagination (admin seulement)
+- `GET /api/v1/users/:id` - Détails d'un utilisateur (admin seulement)
+- `PATCH /api/v1/users/:id/role` - Mise à jour du rôle utilisateur (admin seulement)
+- `DELETE /api/v1/users/:id` - Suppression d'utilisateur (admin seulement)
+- Middleware `isAdmin` pour protection des routes admin
+- Middleware `errorHandler` pour gestion centralisée des erreurs
+- Configuration base de données centralisée (`config/database.ts`)
+- Extension TypeScript pour `Express.Request` (ajout de `req.user`)
+- Protection contre l'auto-suppression (admin ne peut pas supprimer son propre compte)
+
+### 🔧 Corrigé (Fixed)
+- Correction des types TypeScript pour compatibilité avec Prisma UUID
+- Correction des sélecteurs Prisma (champs `fullName` et `updatedAt` inexistants)
+
+---
+
+## [0.4.0] - 2026-06-12
+
+### ✅ Ajouté (Added)
+
+#### J3 - Authentification JWT complète
 - Inscription utilisateur (`POST /api/v1/auth/register`)
 - Connexion avec JWT (`POST /api/v1/auth/login`)
 - Refresh token (`POST /api/v1/auth/refresh`)
 - Déconnexion avec invalidation tokenVersion (`POST /api/v1/auth/logout`)
 - Récupération profil connecté (`GET /api/v1/auth/me`)
-
-#### Rôles et permissions
-- Rôle `USER` par défaut
-- Rôle `ADMIN` (seed par défaut: `admin@example.com` / `Admin123`)
-- Route protégée `GET /api/v1/users` (admin seulement)
-- Route protégée `DELETE /api/v1/users/:id` (admin seulement)
-
-#### Paiement Mobile Money
-- Intégration FedaPay SDK
-- Initier paiement (`POST /api/v1/paiement/initier`)
-- Webhook FedaPay (`POST /api/v1/paiement/webhook`)
-- Vérification statut transaction (`GET /api/v1/paiement/status/:id`)
-- Table `Transaction` avec statuts: PENDING, SUCCESS, FAILED
-
-#### Base de données (Prisma)
-- Modèle `User` (id, email, password, role, tokenVersion, createdAt)
-- Modèle `Transaction` (id, userId, amount, phone, status, fedapayId, createdAt)
-- Migration initiale
-- Seed automatique (admin + user test)
+- Middleware `auth` pour vérification JWT
+- Middleware `validate` pour validation Zod automatique
+- TokenVersion pour invalidation des refresh tokens au logout
 
 #### Sécurité
 - Helmet pour en-têtes HTTP sécurisés
 - CORS configurable
-- Rate limiting (100 requêtes/15 min par IP)
 - Validation Zod pour toutes les entrées
 - Hash bcrypt pour mots de passe
-- .env.example commenté avec toutes les variables
-
-#### Documentation
-- Swagger UI sur `/api-docs`
-- README complet avec exemples cURL
-- `docs/ARCHITECTURE.md` - Architecture technique
-- `docs/IA_CONTEXT.md` - Contexte pour IA (Cursor/Copilot)
-- `docs/TROUBLESHOOTING.md` - Résolution problèmes courants
-- `CHANGELOG.md` - Ce fichier
-
-#### Infrastructure
-- Docker Compose (PostgreSQL + App)
-- Dockerfile multi-stage (node:18-alpine)
-- Script `npm run setup` (installation automatique)
-- Script `npm run change-admin-password` (sécurité production)
-
-#### Middlewares
-- `auth.ts` - Vérification token JWT
-- `isAdmin.ts` - Vérification rôle ADMIN
-- `validate.ts` - Validation Zod automatique
-- `errorHandler.ts` - Gestion d'erreurs centralisée
-- `rateLimit.ts` - Limitation des requêtes
-
-#### Utilitaires
-- `jwt.ts` - Génération/vérification tokens
-- `logger.ts` - Logs avec Winston
-- `AppError.ts` - Classe d'erreur personnalisée
-- `catchAsync.ts` - Wrapper pour éviter try/catch répétitifs
-
-#### Configuration
-- `config/app.config.ts` - Configuration Express
-- `config/database.config.ts` - Connexion Prisma
-- `config/fedapay.config.ts` - Initialisation FedaPay
-- `config/swagger.config.ts` - Documentation API
-
-#### Types TypeScript
-- `express.d.ts` - Extension du type Request (ajout de `req.user`)
-- `jwt.types.ts` - Types pour payload JWT
-
-#### Scripts npm
-- `npm run dev` - Lancement mode développement (nodemon)
-- `npm run build` - Compilation TypeScript
-- `npm run start` - Lancement production
-- `npm run setup` - Installation complète (Docker + migrate + seed)
-- `npm run seed` - Réinitialisation base avec données test
-- `npm run change-admin-password` - Changement mot de passe admin
-- `npm run lint` - Vérification code (ESLint)
-- `npm run format` - Formatage code (Prettier)
-
-#### Routes API complètes
-- `GET /health` - Vérification santé du serveur
-- `GET /api-docs` - Interface Swagger
-- `GET /api/v1/auth/me` - Profil utilisateur
-- `POST /api/v1/auth/register` - Inscription
-- `POST /api/v1/auth/login` - Connexion
-- `POST /api/v1/auth/logout` - Déconnexion
-- `POST /api/v1/auth/refresh` - Rafraîchissement token
-- `GET /api/v1/users` - Liste utilisateurs (admin)
-- `DELETE /api/v1/users/:id` - Suppression utilisateur (admin)
-- `POST /api/v1/paiement/initier` - Initier paiement
-- `POST /api/v1/paiement/webhook` - Callback FedaPay
-- `GET /api/v1/paiement/status/:id` - Statut transaction
+- Rate limiting (morgan pour logs)
 
 ---
 
-### 🔧 Corrigé (Fixed)
-- Rien à signaler (première version)
+## [0.3.0] - 2026-06-12
+
+### ✅ Ajouté (Added)
+
+#### J2 - Base de données + Prisma
+- Modèle `User` (id UUID, email, password, role, tokenVersion, createdAt)
+- Modèle `Transaction` (id UUID, userId, amount, phone, status, fedapayId, createdAt)
+- Enums `Role` (USER, ADMIN) et `Status` (PENDING, SUCCESS, FAILED)
+- Migration initiale Prisma
+- Seed automatique (admin + user test)
+- Docker Compose avec PostgreSQL (port 5433)
 
 ---
 
-### 🗑️ Déprécié (Deprecated)
-- Rien à signaler (première version)
+## [0.2.0] - 2026-06-12
+
+### ✅ Ajouté (Added)
+
+#### J1 - Initialisation du projet
+- Structure de dossiers `src/` (controllers, middlewares, routes, services, utils, validations)
+- Configuration TypeScript (`tsconfig.json`)
+- Dépendances installées (Express, Prisma, JWT, bcrypt, Zod, etc.)
+- Fichiers de configuration (`.env.example`, `.gitignore`)
+- Nodemon pour développement
 
 ---
 
-### ⚠️ Sécurité
-- Avertissement dans README sur changement credentials admin par défaut
-- Script `change-admin-password.ts` pour sécuriser avant production
-- TokenVersion implémenté (pas besoin de Redis pour invalidation)
-- Variables sensibles exclues du versioning (`.env` dans `.gitignore`)
+## [0.1.0] - 2026-06-11
+
+### ✅ Ajouté (Added)
+
+#### J0 - Préparation
+- Création du repository GitHub privé
+- Documentation de base (README, ROADMAP, CHANGELOG)
+- Compte FedaPay sandbox créé
 
 ---
 
-### 📊 Métriques v1.0.0
+## [1.0.0] - À venir (prévu 2026-06-18)
 
-| Métrique | Valeur |
-|----------|--------|
-| Lignes de code (TypeScript) | ~2500 |
-| Nombre d'endpoints | 12 |
-| Temps d'installation (Docker) | < 2 minutes |
-| Taille image Docker | ~200 MB |
-| Mémoire requise (API + DB) | 512 MB RAM |
-| Tests manuels effectués | ✅ 100% |
+### Fonctionnalités restantes
+
+#### J5 - Paiement Mobile Money (FedaPay)
+- [ ] Configuration FedaPay SDK (`config/fedapay.ts`)
+- [ ] Service paiement (`services/paiement.service.ts`)
+- [ ] Controller paiement (`controllers/paiementController.ts`)
+- [ ] Validation Zod (`validations/paiementValidation.ts`)
+- [ ] Routes paiement (`routes/paiementRoutes.ts`)
+  - `POST /api/v1/paiement/initier`
+  - `POST /api/v1/paiement/webhook`
+  - `GET /api/v1/paiement/status/:id`
+
+#### J6 - Documentation Swagger
+- [ ] Installation Swagger (`swagger-ui-express`, `swagger-jsdoc`)
+- [ ] Configuration Swagger (`config/swagger.ts`)
+- [ ] Documentation JSDoc pour tous les endpoints
+- [ ] Swagger UI accessible sur `/api-docs`
+
+#### J7 - Docker + Scripts
+- [ ] Dockerfile multi-stage (node:18-alpine)
+- [ ] Script `scripts/setup.sh` (installation automatique)
+- [ ] Script npm `npm run setup`
+- [ ] Test sur machine vierge
+
+#### J8 - Tests + Sécurité
+- [ ] Tests manuels Postman (tous les endpoints)
+- [ ] Script `scripts/change-admin-password.ts`
+- [ ] Script npm `npm run change-admin-password`
+- [ ] Vérification gestion d'erreurs
+
+#### J9 - Vidéo + Préparation vente
+- [ ] Enregistrement vidéo démo (max 3 min)
+- [ ] Captures d'écran (Swagger, Postman, terminal)
+- [ ] Rédaction annonce Chariow
+- [ ] Création ZIP (`git archive`)
+- [ ] Tag GitHub `v1.0.0`
+
+#### J10 - Publication
+- [ ] Publication sur Chariow (3 offres)
+- [ ] Préparation réponses types support
+- [ ] Création email support
+- [ ] Promotion (groupes Facebook, WhatsApp)
 
 ---
 
@@ -146,7 +142,6 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 #### 🔜 Nouvelles fonctionnalités
 - [ ] Envoi email de bienvenue (Nodemailer + templates)
-- [ ] Pagination sur `GET /api/v1/users`
 - [ ] Tests unitaires avec Jest (couverture > 80%)
 - [ ] Tests d'intégration avec Supertest
 - [ ] Redis pour cache (optionnel, désactivable)
@@ -161,48 +156,33 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - [ ] Webhook retry avec backoff exponentiel
 - [ ] Health check plus détaillé (DB, Redis, FedaPay)
 
-#### 📚 Documentation
-- [ ] Video tutoriel déploiement (YouTube)
-- [ ] Exemple d'intégration React/Next.js
-- [ ] Exemple d'intégration Flutter
-
 ---
 
 ## [2.0.0] - Fullstack (prévu Q1 2027)
 
 ### 🎨 Frontend (Next.js)
-
-#### Technologies
 - Next.js 14+ (App Router)
 - Tailwind CSS + Shadcn/ui
 - React Query (tanstack-query)
-- Zustand (état global)
-- next-intl (i18n)
-
-#### Pages
-- Page d'accueil avec documentation
-- Page d'inscription/connexion
-- Dashboard utilisateur
-- Dashboard admin
-- Historique des transactions
-- Profil utilisateur
+- Dashboard utilisateur + admin
 
 ### ⚙️ Backend (nouveautés)
+- Upload fichiers (Cloudinary ou AWS S3)
+- WebSockets (Socket.io) pour notifications temps réel
+- 2FA (authentification deux facteurs)
+- OAuth (Google, GitHub)
 
-#### Nouvelles fonctionnalités
-- [ ] Upload fichiers (Cloudinary ou AWS S3)
-- [ ] WebSockets (Socket.io) pour notifications temps réel
-- [ ] Export CSV/PDF (rapports transactions)
-- [ ] API rate limit par utilisateur (Redis)
-- [ ] 2FA (authentification deux facteurs)
-- [ ] OAuth (Google, GitHub)
-- [ ] Queue système (BullMQ + Redis)
+---
 
-#### Infrastructure
-- [ ] CI/CD avec GitHub Actions
-- [ ] Monitoring (Prometheus + Grafana)
-- [ ] APM (OpenTelemetry)
-- [ ] Backup automatisé sur S3
+## 📊 Métriques actuelles (v0.5.0)
+
+| Métrique | Valeur |
+|----------|--------|
+| Lignes de code (TypeScript) | ~800 |
+| Nombre d'endpoints | 7 |
+| Jours complétés | 4 / 10 |
+| Progression globale | 40% |
+| Tests manuels effectués | ✅ J3 + J4 validés |
 
 ---
 
@@ -210,63 +190,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 | Version | Statut | Support | Dernière mise à jour |
 |---------|--------|---------|---------------------|
-| 1.0.x | ✅ Actif (stable) | Bug fixes + sécurité | 2026-06-11 |
-| 1.1.x | 🚧 En développement | Nouvelles fonctionnalités | À venir |
+| 0.x.x | 🚧 En développement | Features en cours | 2026-06-13 |
+| 1.0.0 | 📅 Planifié | Version stable complète | ~2026-06-18 |
+| 1.1.x | 📅 Planifié | Nouvelles fonctionnalités | Q3 2026 |
 | 2.0.0 | 📅 Planifié | Fullstack | Q1 2027 |
 
-**Politique de support** :
-- ✅ Les versions `1.0.x` reçoivent des correctifs de sécurité pendant 12 mois
-- ✅ Les versions stables sont maintenues jusqu'à la prochaine majeure
-- ❌ Aucun support pour les versions non stables (alpha, beta)
-
 ---
 
-## 🔄 Mise à jour depuis une version antérieure
-
-### De v1.0.0 à v1.1.0 (quand disponible)
-```bash
-git pull origin main
-npm install
-npx prisma migrate deploy
-npm run build
-docker-compose down
-docker-compose up -d --build
-De v1.x vers v2.0.0
-Un guide de migration sera fourni avec la sortie de v2.0.0.
-
-👥 Contribution aux changements
-Ce projet suit le Conventional Commits :
-
-Type	Description	Exemple
-feat	Nouvelle fonctionnalité	feat: add email confirmation
-fix	Correction de bug	fix: refresh token expiration
-docs	Documentation	docs: update API examples
-style	Formatage	style: format code with prettier
-refactor	Refactorisation	refactor: extract payment service
-test	Tests	test: add auth integration tests
-chore	Maintenance	chore: update dependencies
-🙏 Remerciements
-Les changements ci-dessus ont été possibles grâce à :
-
-La communauté open-source
-
-FedaPay pour leur SDK Mobile Money
-
-Prisma pour l'ORM moderne
-
-Tous les contributeurs et acheteurs qui soutiennent ce projet
-
-📞 Signaler un bug ou suggérer une amélioration
-Issues GitHub : https://github.com/golanafrica/backend-boilerplate-v1/issues
-
-Email support : support@votredomaine.com
-
-Réponse garantie : 24h ouvrées
-
-Maintenu avec ❤️ par golanafrica
-
-Dernière mise à jour : 2026-06-11
-
-text
-
----
+Dernière mise à jour : 2026-06-13
