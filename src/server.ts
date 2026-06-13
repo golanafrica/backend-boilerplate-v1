@@ -2,9 +2,11 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import paiementRoutes from './routes/paiementRoutes';
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -18,23 +20,36 @@ const PORT: number = parseInt(process.env.PORT || '3000', 10);
 // =====================
 
 // Logger HTTP (morgan)
-app.use(morgan('dev'));
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
 
-// Sécurité : Helmet ajoute des en-têtes HTTP sécurisés
+// Sécurité : Helmet
 app.use(helmet());
 
-// CORS (autoriser les requêtes cross-origin)
+// CORS
 app.use(cors({
-  origin: '*',
+  origin: process.env.CORS_ORIGIN || '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Parser JSON
-app.use(express.json({ limit: '10mb' }));
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
+  message: {
+    success: false,
+    message: 'Trop de requêtes, veuillez réessayer dans 15 minutes'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', limiter);
 
-// Parser URL encoded
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Parsers
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // =====================
 // ROUTES DE TEST
@@ -53,22 +68,29 @@ app.get('/', (req: Request, res: Response) => {
   res.redirect('/health');
 });
 
-app.get('/api/v1', (req: Request, res: Response) => {
-  res.status(200).json({
-    name: 'AfriStarter Backend API',
-    version: '1.0.0',
-    description: 'Boilerplate with Express, TypeScript, JWT, FedaPay',
-    endpoints: {
-      auth: '/api/v1/auth',
-      users: '/api/v1/users',
-      paiement: '/api/v1/paiement',
-      docs: '/api-docs'
-    }
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/v1', (req: Request, res: Response) => {
+    res.status(200).json({
+      name: 'AfriStarter Backend API',
+      version: '1.0.0',
+      description: 'Boilerplate with Express, TypeScript, JWT, FedaPay',
+      endpoints: {
+        auth: '/api/v1/auth',
+        users: '/api/v1/users',
+        paiement: '/api/v1/paiement',
+        docs: '/api-docs'
+      }
+    });
   });
-});
+}
+
+// =====================
+// ROUTES API
+// =====================
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/paiement', paiementRoutes);
 
 // =====================
 // GESTION DES ERREURS
@@ -104,6 +126,8 @@ if (require.main === module) {
 ║  📡 Serveur démarré sur http://localhost:${PORT}      ║
 ║  ❤️  Health check: http://localhost:${PORT}/health    ║
 ║  📚 API: http://localhost:${PORT}/api/v1             ║
+║  💰 Paiement: http://localhost:${PORT}/api/v1/paiement ║
+║  🔒 Mode: ${process.env.NODE_ENV || 'development'}              ║
 ╚══════════════════════════════════════════════════════╝
     `);
   });
