@@ -1,38 +1,49 @@
 import { prisma } from '../config/database';
-import { fedapayClient } from '../config/fedapay';
+import { PaymentFactory } from './payment/PaymentFactory';
 import { AppError } from '../utils/AppError';
 
 export class PaiementService {
   /**
-   * Initier un paiement Mobile Money
+   * Initier un paiement (multi-processeur)
    */
   async initierPaiement(
     userId: string,
     amount: number,
-    phone: string,
-    description: string
+    phone: string | undefined,
+    email: string | undefined,
+    description: string,
+    provider?: string
   ) {
+    // 1. Créer la transaction en base (statut PENDING)
     const transaction = await prisma.transaction.create({
       data: {
         userId,
         amount,
-        phone,
+        phone: phone || '',
         status: 'PENDING',
       },
     });
 
     try {
-      const fedapayResponse = await fedapayClient.createTransaction({
+      // 2. Récupérer le processeur (par défaut ou spécifique)
+      const paymentProvider = provider 
+        ? PaymentFactory.getProviderByName(provider)
+        : PaymentFactory.getProvider();
+
+      // 3. Créer le paiement via le processeur
+      const paymentResult = await paymentProvider.createPayment({
         amount,
         phone,
+        email,
         description,
-        callback_url: `${process.env.APP_URL || 'http://localhost:3000'}/api/v1/paiement/callback`,
+        callbackUrl: `${process.env.APP_URL || 'http://localhost:3000'}/api/v1/paiement/callback`,
       });
 
+      // 4. Mettre à jour la transaction avec l'ID du processeur
       const updatedTransaction = await prisma.transaction.update({
         where: { id: transaction.id },
         data: {
-          fedapayId: fedapayResponse.transaction?.id?.toString() || fedapayResponse.id?.toString(),
+          fedapayId: paymentResult.providerTransactionId, // On garde le champ pour compatibilité
         },
         include: {
           user: {
@@ -43,10 +54,12 @@ export class PaiementService {
 
       return {
         transaction: updatedTransaction,
-        paymentUrl: fedapayResponse.url || null,
-        token: fedapayResponse.token || null,
+        paymentUrl: paymentResult.paymentUrl,
+        token: paymentResult.token,
+        provider: paymentResult.provider,
       };
     } catch (error) {
+      // En cas d'erreur, marquer la transaction comme FAILED
       await prisma.transaction.update({
         where: { id: transaction.id },
         data: { status: 'FAILED' },
@@ -57,44 +70,34 @@ export class PaiementService {
   }
 
   /**
-   * Mapper un statut FedaPay vers notre statut
-   * 🔒 Protection : gestion des valeurs null/undefined
+   * Gérer le webhook (multi-processeur)
    */
-  private mapFedaPayStatus(rawStatus: any): 'PENDING' | 'SUCCESS' | 'FAILED' {
-    const status = String(rawStatus || '').toLowerCase().trim();
+  async handleWebhook(payload: any, provider?: string) {
+    // 1. Récupérer le processeur
+    const paymentProvider = provider 
+      ? PaymentFactory.getProviderByName(provider)
+      : PaymentFactory.getProvider();
 
-    if (['approved', 'completed', 'successful', 'success'].includes(status)) {
-      return 'SUCCESS';
-    }
-    if (['failed', 'rejected', 'cancelled', 'canceled', 'declined'].includes(status)) {
-      return 'FAILED';
-    }
-    return 'PENDING';
-  }
+    // 2. Parser le webhook
+    const webhookData = paymentProvider.parseWebhook(payload);
 
-  /**
-   * Gérer le webhook de FedaPay
-   */
-  async handleWebhook(payload: any) {
-    const fedapayId = payload.transaction_id?.toString() || payload.id?.toString();
-
-    if (!fedapayId) {
+    if (!webhookData.providerTransactionId) {
       throw new AppError('Transaction ID manquant dans le webhook', 400);
     }
 
+    // 3. Trouver la transaction dans notre base
     const transaction = await prisma.transaction.findFirst({
-      where: { fedapayId },
+      where: { fedapayId: webhookData.providerTransactionId },
     });
 
     if (!transaction) {
       throw new AppError('Transaction non trouvée dans notre système', 404);
     }
 
-    const newStatus = this.mapFedaPayStatus(payload.status);
-
+    // 4. Mettre à jour le statut
     const updatedTransaction = await prisma.transaction.update({
       where: { id: transaction.id },
-      data: { status: newStatus },
+      data: { status: webhookData.status },
       include: {
         user: {
           select: { id: true, email: true },
@@ -102,13 +105,13 @@ export class PaiementService {
       },
     });
 
-    console.log(`[FedaPay Webhook] Transaction ${transaction.id} → ${newStatus}`);
+    console.log(`[${paymentProvider.name} Webhook] Transaction ${transaction.id} → ${webhookData.status}`);
 
     return updatedTransaction;
   }
 
   /**
-   * Récupérer le statut d'une transaction
+   * Récupérer le statut d'une transaction (multi-processeur)
    */
   async getTransactionStatus(transactionId: string, userId: string) {
     const transaction = await prisma.transaction.findFirst({
@@ -124,21 +127,21 @@ export class PaiementService {
       throw new AppError('Transaction non trouvée', 404);
     }
 
+    // Si la transaction est encore PENDING, vérifier le statut auprès du processeur
     if (transaction.status === 'PENDING' && transaction.fedapayId) {
       try {
-        const fedapayData = await fedapayClient.getTransaction(transaction.fedapayId);
-        const fedapayStatus = fedapayData.transaction?.status || fedapayData.status;
-        const newStatus = this.mapFedaPayStatus(fedapayStatus);
+        const paymentProvider = PaymentFactory.getProvider();
+        const statusData = await paymentProvider.getTransactionStatus(transaction.fedapayId);
 
-        if (newStatus !== 'PENDING') {
+        if (statusData.status !== 'PENDING') {
           await prisma.transaction.update({
             where: { id: transaction.id },
-            data: { status: newStatus },
+            data: { status: statusData.status },
           });
-          transaction.status = newStatus;
+          transaction.status = statusData.status;
         }
       } catch (error) {
-        console.error('[FedaPay] Erreur lors de la vérification du statut:', error);
+        console.error('[Payment] Erreur lors de la vérification du statut:', error);
       }
     }
 

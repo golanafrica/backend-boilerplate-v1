@@ -1,15 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import { paiementService } from '../services/paiement.service';
-import { fedapayClient } from '../config/fedapay';
+import { PaymentFactory } from '../services/payment/PaymentFactory';
 
 export class PaiementController {
   async initierPaiement(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const { amount, phone, description } = req.body;
+      const { amount, phone, email, description, provider } = req.body;
 
       const result = await paiementService.initierPaiement(
-        userId, amount, phone, description
+        userId,
+        amount,
+        phone,
+        email,
+        description,
+        provider
       );
 
       res.status(201).json({
@@ -25,6 +30,7 @@ export class PaiementController {
           },
           paymentUrl: result.paymentUrl,
           token: result.token,
+          provider: result.provider,
         },
       });
     } catch (error) {
@@ -32,26 +38,27 @@ export class PaiementController {
     }
   }
 
-  /**
-   * POST /api/v1/paiement/webhook
-   * 🔒 Utilise req.rawBody (capturé par middleware dans routes)
-   */
   async webhook(req: Request, res: Response, next: NextFunction) {
     try {
-      const signature = req.headers['x-fedapay-signature'] as string;
+      const provider = req.query.provider as string || process.env.PAYMENT_PROVIDER || 'fedapay';
+      const signature = req.headers[`${provider}-signature`] as string || 
+                       req.headers['x-fedapay-signature'] as string ||
+                       req.headers['stripe-signature'] as string;
       
-      // 🔒 Récupérer le raw body (capturé dans paiementRoutes.ts)
       const rawBody = (req as any).rawBody || JSON.stringify(req.body);
 
-      if (signature && !fedapayClient.verifyWebhookSignature(rawBody, signature)) {
-        console.warn('[FedaPay Webhook] ❌ Signature invalide depuis', req.ip);
+      // Vérifier la signature
+      const paymentProvider = PaymentFactory.getProviderByName(provider);
+      
+      if (signature && !paymentProvider.verifyWebhookSignature(signature, rawBody)) {
+        console.warn(`[${provider} Webhook] ❌ Signature invalide depuis`, req.ip);
         return res.status(401).json({
           success: false,
           message: 'Signature webhook invalide',
         });
       }
 
-      const transaction = await paiementService.handleWebhook(req.body);
+      const transaction = await paiementService.handleWebhook(req.body, provider);
 
       res.status(200).json({
         success: true,
@@ -60,8 +67,7 @@ export class PaiementController {
         status: transaction.status,
       });
     } catch (error) {
-      console.error('[FedaPay Webhook] Erreur:', error);
-      // Toujours répondre 200 à FedaPay pour éviter les retries
+      console.error('[Webhook] Erreur:', error);
       res.status(200).json({
         success: false,
         message: 'Webhook reçu mais erreur de traitement',
@@ -104,6 +110,16 @@ export class PaiementController {
     } catch (error) {
       next(error);
     }
+  }
+
+  async getProviders(req: Request, res: Response) {
+    res.json({
+      success: true,
+      data: {
+        current: process.env.PAYMENT_PROVIDER || 'fedapay',
+        available: PaymentFactory.getAvailableProviders(),
+      },
+    });
   }
 
   async success(req: Request, res: Response) {
